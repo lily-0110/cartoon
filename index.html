@@ -1,14 +1,32 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
-  <link href='/style.css' rel='stylesheet'>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartoon Generator</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
-  <script defer type="text/javascript" src="/main.js"></script>
+    <header>
+        <h1>Cartoon Generator</h1>
+    </header>
+    <main>
+        <div class="container">
+            <div id="story-container">
+                <textarea id="story" placeholder="e.g., A brave knight goes on a quest to find a hidden treasure. He battles a dragon, meets a wise wizard, and finally discovers the treasure in a cave."></textarea>
+                <button id="generate">Generate</button>
+            </div>
+            <div id="cartoon-container">
+                <div class="panel" id="panel-1"></div>
+                <div class="panel" id="panel-2"></div>
+                <div class="panel" id="panel-3"></div>
+                <div class="panel" id="panel-4"></div>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>&copy; 2026 Cartoon Generator</p>
+    </footer>
+    <script src="main.js"></script>
 </body>
 </html>
