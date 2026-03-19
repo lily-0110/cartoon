@@ -10,15 +10,44 @@ const panels = [
 generateBtn.addEventListener('click', generateCartoon);
 
 async function generateImage(prompt) {
-    //
-    // In a real application, this would be a call to an image generation API.
-    // For now, we'll return a placeholder image from unspalsh.
-    //
-    const response = await fetch(`https://source.unsplash.com/random/500x500/?${encodeURIComponent(prompt)}`);
-    if (!response.ok) {
-        throw new Error('Failed to generate image');
+    if (typeof GEMINI_API_KEY === 'undefined' || GEMINI_API_KEY === 'YOUR_API_KEY') {
+        alert('Please set your Gemini API key in config.js');
+        throw new Error('API key not set');
     }
-    return response.url;
+
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-image:generateImage?key=${GEMINI_API_KEY}`;
+
+    const requestBody = {
+        "prompt": {
+            "text": prompt
+        },
+        "image_generation_config": {
+            "number_of_images": 1,
+            "image_format": "PNG"
+        }
+    };
+
+    const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to generate image: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (data.images && data.images.length > 0) {
+        return `data:image/png;base64,${data.images[0].base64Image}`;
+    } else {
+        // Fallback to a placeholder if the API doesn't return an image
+        const hash = prompt.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+        const color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+        return `https://via.placeholder.com/500x500/${color}/FFFFFF?text=${encodeURIComponent(prompt)}`;
+    }
 }
 
 async function generateCartoon() {
