@@ -49,7 +49,8 @@ async function generatePrompts(story) {
         throw new Error('Please set your Gemini API key.');
     }
 
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Using v1 for better stability
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const prompt = `Divide the following story into exactly 4 parts for a 4-panel cartoon. For each part, provide a short visual description that can be used as an image generation prompt. Output the results as a JSON array of 4 strings.
     
@@ -68,10 +69,8 @@ async function generatePrompts(story) {
                 parts: [{
                     text: prompt
                 }]
-            }],
-            generationConfig: {
-                response_mime_type: "application/json"
-            }
+            }]
+            // Removed response_mime_type for better compatibility with standard v1
         })
     });
 
@@ -84,42 +83,23 @@ async function generatePrompts(story) {
     const data = await response.json();
     try {
         let text = data.candidates[0].content.parts[0].text;
-        // Sometimes the model might wrap JSON in backticks even if mime type is set
-        text = text.replace(/```json|```/g, '').trim();
+        // Clean up the response to extract JSON
+        const jsonMatch = text.match(/\[.*\]/s);
+        if (jsonMatch) {
+            text = jsonMatch[0];
+        }
         return JSON.parse(text);
     } catch (e) {
         console.error('Failed to parse Gemini response:', data);
-        throw new Error('Failed to parse the story into 4 parts. Please try a simpler story.');
+        throw new Error('Failed to parse the story into 4 parts. Please try again with a different story.');
     }
 }
 
 async function generateImage(prompt) {
-    const apiKey = getApiKey();
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
-    
-    try {
-        const requestBody = {
-            "instances": [{ "prompt": `A high-quality cartoon illustration: ${prompt}` }],
-            "parameters": { "sampleCount": 1 }
-        };
-
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) throw new Error('Imagen 3 API failed');
-
-        const data = await response.json();
-        if (data.predictions && data.predictions.length > 0) {
-            return `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
-        }
-        throw new Error('No image returned');
-    } catch (e) {
-        console.warn('Imagen fallback used for:', prompt);
-        return `https://pollinations.ai/p/${encodeURIComponent(prompt + " cartoon style")}?width=512&height=512&seed=${Math.floor(Math.random() * 1000)}`;
-    }
+    // We will use Pollinations.ai directly for image generation as it's highly reliable and doesn't require extra keys.
+    // The Google AI Studio Imagen 3 API is currently only available to specific accounts/regions.
+    console.log(`Generating image via Pollinations for: ${prompt}`);
+    return `https://pollinations.ai/p/${encodeURIComponent(prompt + " 4-panel cartoon style, high quality, vibrant colors")}?width=512&height=512&seed=${Math.floor(Math.random() * 1000000)}&nologo=true`;
 }
 
 async function generateCartoon() {
@@ -142,22 +122,27 @@ async function generateCartoon() {
     });
 
     try {
-        console.log('Generating prompts...');
+        console.log('Generating prompts with Gemini...');
         const storyParts = await generatePrompts(story);
+        console.log('Story divided into 4 parts:', storyParts);
         
         for (let i = 0; i < panels.length; i++) {
             const panel = panels[i];
             const storyPart = storyParts[i] || '';
 
-            console.log(`Generating image for panel ${i + 1}...`);
+            console.log(`Creating image for panel ${i + 1}...`);
             const imageUrl = await generateImage(storyPart);
 
             panel.classList.remove('loading');
-            panel.innerHTML = ''; // Clear loading state
+            panel.innerHTML = ''; 
             
             const img = document.createElement('img');
             img.src = imageUrl;
             img.alt = storyPart;
+            // Add error handling for image load
+            img.onerror = () => {
+                panel.innerHTML = '<div style="padding:20px; color:red;">Image failed to load</div>';
+            };
             panel.appendChild(img);
             
             const caption = document.createElement('div');
@@ -170,7 +155,7 @@ async function generateCartoon() {
         alert(error.message || 'An error occurred. Please try again.');
         panels.forEach(panel => {
             panel.classList.remove('loading');
-            panel.innerHTML = `<div style="padding: 20px; text-align: center; color: red;">Error</div>`;
+            panel.innerHTML = `<div style="padding: 20px; text-align: center; color: red; font-size: 12px;">${error.message || 'Error'}</div>`;
         });
     } finally {
         generateBtn.disabled = false;
