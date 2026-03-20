@@ -9,44 +9,85 @@ const panels = [
 
 generateBtn.addEventListener('click', generateCartoon);
 
-async function generateImage(prompt) {
+async function generatePrompts(story) {
     if (typeof GEMINI_API_KEY === 'undefined' || GEMINI_API_KEY === 'YOUR_API_KEY') {
         alert('Please set your Gemini API key in config.js');
         throw new Error('API key not set');
     }
 
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-image:generateImage?key=${GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-    const requestBody = {
-        "prompt": {
-            "text": prompt
-        },
-        "image_generation_config": {
-            "number_of_images": 1,
-            "image_format": "PNG"
-        }
-    };
+    const prompt = `Divide the following story into exactly 4 parts for a 4-panel cartoon. For each part, provide a short visual description that can be used as an image generation prompt. Output the results as a JSON array of 4 strings.
+    
+    Story: ${story}
+    
+    Output format example:
+    ["description of panel 1", "description of panel 2", "description of panel 3", "description of panel 4"]`;
 
     const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+            contents: [{
+                parts: [{
+                    text: prompt
+                }]
+            }],
+            generationConfig: {
+                response_mime_type: "application/json"
+            }
+        })
     });
 
     if (!response.ok) {
-        throw new Error(`Failed to generate image: ${response.statusText}`);
+        throw new Error(`Failed to generate prompts: ${response.statusText}`);
     }
 
     const data = await response.json();
-    if (data.images && data.images.length > 0) {
-        return `data:image/png;base64,${data.images[0].base64Image}`;
-    } else {
-        // Fallback to a placeholder if the API doesn't return an image
-        const hash = prompt.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
-        const color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-        return `https://via.placeholder.com/500x500/${color}/FFFFFF?text=${encodeURIComponent(prompt)}`;
+    const text = data.candidates[0].content.parts[0].text;
+    return JSON.parse(text);
+}
+
+async function generateImage(prompt) {
+    // Since Google AI Studio's Imagen 3 API is currently being rolled out and might have different access patterns,
+    // we will use a more robust way to handle image generation or provide a high-quality placeholder if it fails.
+    // For now, let's try the common v1beta Imagen endpoint.
+    
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${GEMINI_API_KEY}`;
+    
+    try {
+        const requestBody = {
+            "instances": [
+                { "prompt": `A high-quality 4-panel cartoon style illustration: ${prompt}` }
+            ],
+            "parameters": {
+                "sampleCount": 1
+            }
+        };
+
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            console.warn(`Imagen 3 API failed, using fallback. Status: ${response.status}`);
+            throw new Error('Imagen 3 API failed');
+        }
+
+        const data = await response.json();
+        if (data.predictions && data.predictions.length > 0) {
+            return `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+        }
+    } catch (e) {
+        // Fallback: Using a stable, high-quality image placeholder or a known public API if Gemini API fails
+        // For the purpose of this demo, let's use Pollinations or similar if Imagen is not ready
+        return `https://pollinations.ai/p/${encodeURIComponent(prompt + " cartoon style")}?width=512&height=512&seed=${Math.floor(Math.random() * 1000)}`;
     }
 }
 
@@ -64,20 +105,28 @@ async function generateCartoon() {
     });
 
     try {
-        const storyParts = splitStory(story);
+        console.log('Generating prompts...');
+        const storyParts = await generatePrompts(story);
+        console.log('Generated prompts:', storyParts);
 
         for (let i = 0; i < panels.length; i++) {
             const panel = panels[i];
             const storyPart = storyParts[i] || '';
 
+            console.log(`Generating image for panel ${i + 1}...`);
             const imageUrl = await generateImage(storyPart);
 
-            console.log(`Generating panel ${i + 1} with story: ${storyPart}`);
             panel.classList.remove('loading');
             const img = document.createElement('img');
             img.src = imageUrl;
             img.alt = storyPart;
             panel.appendChild(img);
+            
+            // Add caption to the panel
+            const caption = document.createElement('div');
+            caption.className = 'caption';
+            caption.textContent = storyPart;
+            panel.appendChild(caption);
         }
     } catch (error) {
         console.error('Error generating cartoon:', error);
@@ -89,27 +138,4 @@ async function generateCartoon() {
     } finally {
         generateBtn.disabled = false;
     }
-}
-
-function splitStory(story) {
-    const sentences = story.match(/[^.!?]+[.!?]+/g) || [story];
-    const parts = ['', '', '', ''];
-
-    if (sentences.length === 1) {
-        parts[0] = sentences[0];
-    } else if (sentences.length === 2) {
-        parts[0] = sentences[0];
-        parts[1] = sentences[1];
-    } else if (sentences.length === 3) {
-        parts[0] = sentences[0];
-        parts[1] = sentences[1];
-        parts[2] = sentences[2];
-    } else {
-        const partLength = Math.ceil(sentences.length / 4);
-        for (let i = 0; i < 4; i++) {
-            parts[i] = sentences.slice(i * partLength, (i + 1) * partLength).join(' ');
-        }
-    }
-
-    return parts;
 }
