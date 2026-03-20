@@ -7,15 +7,46 @@ const panels = [
     document.getElementById('panel-4'),
 ];
 
+// Modal elements
+const settingsBtn = document.getElementById('settings-btn');
+const modal = document.getElementById('api-modal');
+const closeBtn = document.getElementById('close-modal');
+const saveBtn = document.getElementById('save-key');
+const apiKeyInput = document.getElementById('api-key-input');
+
+// Initialize API Key from localStorage if available
+if (localStorage.getItem('gemini_api_key')) {
+    window.GEMINI_API_KEY = localStorage.getItem('gemini_api_key');
+    apiKeyInput.value = window.GEMINI_API_KEY;
+}
+
+settingsBtn.onclick = () => modal.style.display = 'flex';
+closeBtn.onclick = () => modal.style.display = 'none';
+window.onclick = (e) => { if (e.target == modal) modal.style.display = 'none'; };
+
+saveBtn.onclick = () => {
+    const key = apiKeyInput.value.trim();
+    if (key) {
+        localStorage.setItem('gemini_api_key', key);
+        window.GEMINI_API_KEY = key;
+        alert('API Key saved successfully!');
+        modal.style.display = 'none';
+    }
+};
+
 generateBtn.addEventListener('click', generateCartoon);
 
 async function generatePrompts(story) {
-    if (typeof GEMINI_API_KEY === 'undefined' || GEMINI_API_KEY === 'YOUR_API_KEY') {
-        alert('Please set your Gemini API key in config.js');
+    // Check if GEMINI_API_KEY is available in the global window object or localStorage
+    let apiKey = window.GEMINI_API_KEY || localStorage.getItem('gemini_api_key');
+    
+    if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey === '') {
+        modal.style.display = 'flex';
+        alert('Please set your Gemini API key first.');
         throw new Error('API key not set');
     }
 
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const prompt = `Divide the following story into exactly 4 parts for a 4-panel cartoon. For each part, provide a short visual description that can be used as an image generation prompt. Output the results as a JSON array of 4 strings.
     

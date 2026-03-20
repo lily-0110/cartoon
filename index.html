@@ -9,8 +9,20 @@
 <body>
     <header>
         <h1>Cartoon Generator</h1>
+        <button id="settings-btn" title="API Key Settings">⚙️</button>
     </header>
     <main>
+        <div id="api-modal" class="modal">
+            <div class="modal-content">
+                <h3>Set Gemini API Key</h3>
+                <p>Your key is stored locally in your browser.</p>
+                <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key">
+                <div class="modal-buttons">
+                    <button id="save-key">Save</button>
+                    <button id="close-modal">Close</button>
+                </div>
+            </div>
+        </div>
         <div class="container">
             <div id="story-container">
                 <textarea id="story" placeholder="e.g., A brave knight goes on a quest to find a hidden treasure. He battles a dragon, meets a wise wizard, and finally discovers the treasure in a cave."></textarea>
